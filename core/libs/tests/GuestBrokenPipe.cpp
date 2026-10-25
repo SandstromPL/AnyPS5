@@ -11,6 +11,7 @@ constexpr int Unix = 1;
 constexpr int Stream = 1;
 constexpr int BrokenPipe = 13;
 constexpr int PipeError = 32;
+constexpr int TryAgain = 35;
 volatile std::sig_atomic_t brokenPipeSignals = 0;
 
 void Require(bool value) {
@@ -47,6 +48,15 @@ int main() {
     GuestSignalSet pending{};
     Require(sigpending_nid_postfix(&pending) == 0 && (pending.bits[0] & blocked.bits[0]) != 0);
     Require(_sigprocmask_nid_postfix(2, &blocked, nullptr) == 0 && brokenPipeSignals == 2);
-    Require(signal_nid_postfix(BrokenPipe, nullptr) == CountBrokenPipe);
+    const KernelTimespec poll{0, 0};
+    Require(_sigprocmask_nid_postfix(1, &blocked, nullptr) == 0);
+    Require(WriteToClosedPeer() == PipeError);
+    Require(sigtimedwait_nid_postfix(&blocked, nullptr, &poll) == BrokenPipe);
+    Require(signal_nid_postfix(BrokenPipe, ignore) == CountBrokenPipe);
+    Require(WriteToClosedPeer() == PipeError);
+    *__error_nid_postfix() = 0;
+    Require(sigtimedwait_nid_postfix(&blocked, nullptr, &poll) == -1 && *__error_nid_postfix() == TryAgain);
+    Require(_sigprocmask_nid_postfix(2, &blocked, nullptr) == 0 && brokenPipeSignals == 2);
+    Require(signal_nid_postfix(BrokenPipe, nullptr) == ignore);
     return 0;
 }
